@@ -1,0 +1,29 @@
+# Entorno
+.env
+*.pyc
+__pycache__/
+.venv/
+venv/
+
+# Airflow
+airflow/logs/
+airflow/plugins/__pycache__/
+
+# dbt
+dbt/target/
+dbt/logs/
+dbt/.user.yml
+
+# Great Expectations
+great_expectations/uncommitted/
+great_expectations/.ge_store_backend_id
+
+# IDEs
+.vscode/
+.idea/
+
+# Datos crudos (descargar con kagglehub)
+data/
+
+# OS
+.DS_Store
