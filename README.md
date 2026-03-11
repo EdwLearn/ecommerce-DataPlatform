@@ -243,5 +243,5 @@ SQL transformations need to be version-controlled, testable, and documented. dbt
 
 ## Author
 
-**Edwin** — Data Engineer
+**EdwLearm** — Data Engineer
 [GitHub](https://github.com/EdwLearn) · [LinkedIn](https://linkedin.com/in/edwlearn)
