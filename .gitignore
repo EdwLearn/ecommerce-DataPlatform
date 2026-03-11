@@ -1,5 +1,7 @@
 # Entorno
 .env
+.env.example
+CLAUDE.md
 *.pyc
 __pycache__/
 .venv/
