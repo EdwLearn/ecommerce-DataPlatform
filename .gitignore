@@ -19,6 +19,8 @@ dbt/.user.yml
 # Great Expectations
 great_expectations/uncommitted/
 great_expectations/.ge_store_backend_id
+gx/uncommitted/
+gx/.ge_store_backend_id
 
 # IDEs
 .vscode/

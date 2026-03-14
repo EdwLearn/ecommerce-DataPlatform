@@ -1,0 +1,49 @@
+name: raw_validation_checkpoint
+config_version: 1.0
+template_name:
+module_name: great_expectations.checkpoint
+class_name: SimpleCheckpoint
+run_name_template: '%Y%m%d-%H%M%S-raw-validation'
+expectation_suite_name:
+batch_request: {}
+action_list:
+  - name: store_validation_result
+    action:
+      class_name: StoreValidationResultAction
+  - name: store_evaluation_params
+    action:
+      class_name: StoreEvaluationParametersAction
+  - name: update_data_docs
+    action:
+      class_name: UpdateDataDocsAction
+evaluation_parameters: {}
+runtime_configuration: {}
+validations:
+  - batch_request:
+      datasource_name: snowflake_datasource
+      data_connector_name: default_inferred_data_connector
+      data_asset_name: raw.orders
+    expectation_suite_name: orders_suite
+  - batch_request:
+      datasource_name: snowflake_datasource
+      data_connector_name: default_inferred_data_connector
+      data_asset_name: raw.order_items
+    expectation_suite_name: order_items_suite
+  - batch_request:
+      datasource_name: snowflake_datasource
+      data_connector_name: default_inferred_data_connector
+      data_asset_name: raw.order_payments
+    expectation_suite_name: order_payments_suite
+  - batch_request:
+      datasource_name: snowflake_datasource
+      data_connector_name: default_inferred_data_connector
+      data_asset_name: raw.order_reviews
+    expectation_suite_name: order_reviews_suite
+  - batch_request:
+      datasource_name: snowflake_datasource
+      data_connector_name: default_inferred_data_connector
+      data_asset_name: raw.customers
+    expectation_suite_name: customers_suite
+profilers: []
+ge_cloud_id:
+expectation_suite_ge_cloud_id:

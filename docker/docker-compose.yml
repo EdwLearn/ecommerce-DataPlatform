@@ -1,7 +1,9 @@
 version: '3.8'
 
 x-airflow-common: &airflow-common
-  image: apache/airflow:2.8.1-python3.11
+  build:
+    context: ..
+    dockerfile: docker/Dockerfile
   environment: &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
@@ -27,7 +29,7 @@ x-airflow-common: &airflow-common
     - ../airflow/plugins:/opt/airflow/plugins
     - ../airflow/logs:/opt/airflow/logs
     - ../dbt:/opt/airflow/dbt
-    - ../great_expectations:/opt/airflow/great_expectations
+    - ../gx:/opt/airflow/gx
     - ../ingestion:/opt/airflow/ingestion
   depends_on:
     postgres:

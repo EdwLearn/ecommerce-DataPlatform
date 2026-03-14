@@ -13,9 +13,13 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+import logging
+
 from dotenv import load_dotenv
-from loguru import logger
 from snowflake_client import SnowflakeConfig, get_connection
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
 load_dotenv()
 
@@ -86,9 +90,9 @@ def load_table(conn, table: str, filename: str, n_cols: int) -> LoadResult:
         """)
 
         result = cur.fetchall()
-        rows_loaded = sum(int(r[3]) for r in result) if result else 0
+        rows_loaded = sum(int(r[3]) for r in result if len(r) > 3) if result else 0
         status = "loaded" if rows_loaded > 0 else "skipped (already loaded)"
-        logger.success(f"[{table}] {rows_loaded:,} filas — {status}")
+        logger.info(f"[{table}] {rows_loaded:,} filas — {status}")
 
     return LoadResult(table=table, rows_loaded=rows_loaded, status=status)
 
@@ -120,7 +124,7 @@ def print_summary(results: list[LoadResult]) -> None:
     errors = 0
     for r in results:
         is_err = r.status.startswith("ERROR")
-        fn = logger.error if is_err else logger.success
+        fn = logger.error if is_err else logger.info
         fn(f"  {r.table:<45} {r.rows_loaded:>10,} filas  [{r.status}]")
         total += r.rows_loaded
         errors += int(is_err)

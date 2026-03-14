@@ -7,10 +7,13 @@ import os
 from contextlib import contextmanager
 from dataclasses import dataclass
 
+import logging
+
 import snowflake.connector
 from dotenv import load_dotenv
-from loguru import logger
 from snowflake.connector import DictCursor, SnowflakeConnection
+
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -76,7 +79,7 @@ def get_connection(config: SnowflakeConfig | None = None) -> SnowflakeConnection
         yield conn
         logger.info("Conexión Snowflake cerrada correctamente")
     except Exception:
-        logger.exception("Error durante la sesión de Snowflake")
+        logger.error("Error durante la sesión de Snowflake", exc_info=True)
         raise
     finally:
         conn.close()
