@@ -164,9 +164,11 @@ ecommerce-data-platform/
 │   │   └── marts/         # fct_orders, dim_customers, ...
 │   ├── tests/             # Custom dbt tests
 │   └── macros/
-├── great_expectations/
-│   ├── expectations/      # Validation suites per table
-│   └── checkpoints/       # Pipeline checkpoints
+├── gx/
+│   ├── expectations/        # 5 validation suites (JSON)
+│   ├── checkpoints/         # Pipeline checkpoint config
+│   ├── create_suites.py     # Bootstrap: generate expectation suites
+│   └── run_checkpoint.py    # Run validations + generate Data Docs
 ├── ingestion/
 │   └── scripts/
 │       ├── upload_to_s3.py          # Bootstrap: local CSVs → S3
@@ -174,7 +176,8 @@ ecommerce-data-platform/
 │       ├── setup_snowflake.sql      # One-time Snowflake setup
 │       └── setup_s3_integration.sql # External stage configuration
 ├── docker/
-│   └── docker-compose.yml  # Airflow local environment
+│   ├── Dockerfile           # Custom Airflow image with dbt + GE
+│   └── docker-compose.yml   # Airflow local environment
 ├── .env.example
 ├── Makefile
 └── requirements.txt
@@ -243,5 +246,5 @@ SQL transformations need to be version-controlled, testable, and documented. dbt
 
 ## Author
 
-**EdwLearm** — Data Engineer
+**Edwin** — Data Engineer
 [GitHub](https://github.com/EdwLearn) · [LinkedIn](https://linkedin.com/in/edwlearn)
