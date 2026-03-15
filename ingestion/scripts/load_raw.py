@@ -69,23 +69,34 @@ def build_select_columns(n_cols: int, filename: str) -> str:
     return f"{cols}, CURRENT_TIMESTAMP(), '{filename}'"
 
 
-def load_table(conn, table: str, filename: str, n_cols: int) -> LoadResult:
+def truncate_table(conn, table: str) -> None:
+    """TRUNCATE tabla RAW para eliminar duplicados antes de recargar."""
+    with conn.cursor() as cur:
+        cur.execute("USE DATABASE ECOMMERCE_DB")
+        cur.execute("USE SCHEMA RAW")
+        cur.execute(f"TRUNCATE TABLE IF EXISTS {table}")
+    logger.info(f"[{table}] TRUNCATED")
+
+
+def load_table(conn, table: str, filename: str, n_cols: int, force: bool = False) -> LoadResult:
     """
     COPY INTO desde el external stage S3.
     No necesita PUT — los archivos ya están en S3 (subidos por upload_to_s3.py).
+    force=True: ignora el historial de carga (necesario tras TRUNCATE).
     """
     select_cols = build_select_columns(n_cols, filename)
     stage_path = f"{S3_STAGE}/{filename}"
+    force_flag = "TRUE" if force else "FALSE"
 
     with conn.cursor() as cur:
         cur.execute("USE DATABASE ECOMMERCE_DB")
         cur.execute("USE SCHEMA RAW")
 
-        logger.info(f"[{table}] COPY INTO desde s3 → {filename}")
+        logger.info(f"[{table}] COPY INTO desde s3 → {filename} (FORCE={force_flag})")
         cur.execute(f"""
             COPY INTO {table}
             FROM (SELECT {select_cols} FROM '{stage_path}')
-            FORCE = FALSE
+            FORCE = {force_flag}
             ON_ERROR = CONTINUE
         """)
 
@@ -97,7 +108,7 @@ def load_table(conn, table: str, filename: str, n_cols: int) -> LoadResult:
     return LoadResult(table=table, rows_loaded=rows_loaded, status=status)
 
 
-def load_all(tables: list[str] | None = None) -> list[LoadResult]:
+def load_all(tables: list[str] | None = None, truncate: bool = False) -> list[LoadResult]:
     targets = {
         k: v for k, v in TABLE_CONFIG.items()
         if tables is None or k in tables
@@ -108,9 +119,17 @@ def load_all(tables: list[str] | None = None) -> list[LoadResult]:
     with get_connection(config) as conn:
         create_raw_tables(conn)
 
+        if truncate:
+            logger.info("=== TRUNCATE habilitado — eliminando datos existentes ===")
+            for table in targets:
+                try:
+                    truncate_table(conn, table)
+                except Exception as e:
+                    logger.error(f"[{table}] TRUNCATE error: {e}")
+
         for table, (filename, n_cols) in targets.items():
             try:
-                results.append(load_table(conn, table, filename, n_cols))
+                results.append(load_table(conn, table, filename, n_cols, force=truncate))
             except Exception as e:
                 logger.error(f"[{table}] {e}")
                 results.append(LoadResult(table, 0, f"ERROR: {e}"))
@@ -136,10 +155,15 @@ def print_summary(results: list[LoadResult]) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Carga S3 → Snowflake RAW via external stage")
     parser.add_argument("--table", nargs="+", help="Tablas a cargar (default: todas)")
+    parser.add_argument(
+        "--truncate",
+        action="store_true",
+        help="TRUNCATE tablas antes de cargar (elimina duplicados). Implica FORCE=TRUE.",
+    )
     args = parser.parse_args()
 
     logger.info("=== Ingesta S3 → Snowflake RAW ===")
-    results = load_all(tables=args.table)
+    results = load_all(tables=args.table, truncate=args.truncate)
     print_summary(results)
 
 
