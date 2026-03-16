@@ -1,152 +1,167 @@
 # Ecommerce Data Platform — Olist Brasil
 
-> End-to-end data engineering platform processing **100,000+ real orders** from Brazil's largest e-commerce marketplace. Built to answer one question: *are we delivering on time, and how much money did we make today?*
+End-to-end data engineering platform processing **1.55 million rows** across 9 tables from Brazil's largest e-commerce marketplace. Built to answer one question: *are we delivering on time, and how much money did we make today?*
 
 ---
 
-## The Problem
+## What Was Built
 
-Raw transactional data is useless for business decisions. It lives in S3 as flat CSVs, has no type safety, contains duplicates, and lacks any business context. A data analyst can't answer "what's our GMV this month by product category?" from a raw CSV dump.
+A production-grade data pipeline that takes raw CSV files and turns them into business-ready metrics — fully automated, validated, and orchestrated.
 
-This platform solves that — from raw files to production-ready business metrics, fully automated.
+```
+AWS S3 (raw CSVs)
+    └── Airflow DAG (daily @ 6am)
+            ├── COPY INTO → Snowflake RAW     (1.55M rows, 9 tables)
+            ├── Great Expectations             (5 suites, 0 failures)
+            ├── dbt run                        (7 staging views + 4 mart tables)
+            └── dbt test                       (17 tests passing)
+```
 
 ---
 
-## North Star Metric
+## Results
 
-**GMV (Gross Merchandise Value) processed per day with a successful delivery rate ≥ 95%**
+| Component | Outcome |
+|---|---|
+| Raw ingestion | 1,550,922 rows loaded across 9 tables — idempotent, no duplicates |
+| dbt staging | 7 views: cleaned, typed, deduplicated, snake_case |
+| dbt marts | 4 tables: `fct_orders`, `dim_customers`, `dim_sellers`, `dim_products` |
+| dbt tests | 17 tests passing (not_null, unique, relationships) |
+| Data quality | 5 GE suites — orders, order_items, order_payments, order_reviews, customers |
+| Orchestration | End-to-end Airflow DAG with retry logic and explicit failure on GE errors |
+
+---
+
+## Dataset — Olist Brasil
+
+Real anonymized transactional data from Brazil's largest e-commerce marketplace.
+
+| Table | Rows | Description |
+|---|---|---|
+| `orders` | 99,441 | Main order record with status and timestamps |
+| `order_items` | 112,650 | Line items per order (product, seller, price) |
+| `order_payments` | 103,886 | Payment methods and values |
+| `order_reviews` | 99,224 | Customer reviews and scores |
+| `customers` | 99,441 | Customer data and geolocation |
+| `sellers` | 3,095 | Seller data |
+| `products` | 32,951 | Product catalog |
+| `geolocation` | 1,000,163 | ZIP code coordinates across Brazil |
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        AWS S3 (Landing Zone)                    │
-│                    s3://ecommerce-olist-raw/                     │
-└────────────────────────────┬────────────────────────────────────┘
-                             │ COPY INTO (External Stage)
-                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                         Snowflake                               │
-│                                                                 │
-│  RAW schema          STAGING schema         MARTS schema        │
-│  ───────────         ─────────────          ────────────        │
-│  1:1 with CSVs  ──►  Cleaned, typed,   ──►  fct_orders         │
-│  No transforms       snake_case, dedup      dim_customers        │
-│                                             dim_sellers          │
-│                                             dim_products         │
-└─────────────────────────────────────────────────────────────────┘
-                             │
-                             │ Orchestrated by
-                             ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                       Apache Airflow 2.8                        │
-│                                                                 │
-│  ingest_raw ──► validate_raw ──► dbt_staging ──► dbt_marts     │
-│                                       │               │         │
-│                                 Great Expectations   dbt test   │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│                  AWS S3 (Landing Zone)               │
+│              s3://ecommerce-olist-raw/raw/olist/     │
+└──────────────────────┬──────────────────────────────┘
+                       │ COPY INTO via External Stage
+                       ▼
+┌─────────────────────────────────────────────────────┐
+│                     Snowflake                        │
+│                                                      │
+│  RAW schema       STAGING schema      MARTS schema   │
+│  ──────────       ─────────────       ────────────   │
+│  1:1 CSVs    ──►  Cleaned, typed ──►  fct_orders     │
+│  + metadata       dedup, casted       dim_customers  │
+│                                       dim_sellers    │
+│                                       dim_products   │
+└──────────────────────┬──────────────────────────────┘
+                       │
+                       ▼
+┌─────────────────────────────────────────────────────┐
+│                  Apache Airflow 2.8                  │
+│                                                      │
+│  copy_into_snowflake                                 │
+│       └── validate_raw (Great Expectations)          │
+│               └── dbt_run                            │
+│                       └── dbt_test                   │
+└─────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology | Why |
-|---|---|---|
-| Orchestration | Apache Airflow 2.8 | Industry standard, DAG-based, great for backfill |
-| Transformation | dbt-core + dbt-snowflake | SQL-first, testable, version-controlled transforms |
-| Data Warehouse | Snowflake | Scalable, separation of compute/storage, native S3 integration |
-| Cloud Storage | AWS S3 | Decoupled landing zone, durability, cost-effective |
-| Data Quality | Great Expectations | Programmatic validation with auto-generated Data Docs |
-| Containerization | Docker + Docker Compose | Reproducible local Airflow environment |
-| Language | Python 3.11 | Type hints, modern syntax, ecosystem |
-
----
-
-## Dataset
-
-**Olist Brasil** — real anonymized transactional data from Brazil's largest e-commerce marketplace.
-
-| Table | Rows | Description |
-|---|---|---|
-| `orders` | ~100k | Main order record with status and timestamps |
-| `order_items` | ~112k | Line items per order (product, seller, price) |
-| `order_payments` | ~103k | Payment methods and values |
-| `order_reviews` | ~99k | Customer reviews and scores |
-| `customers` | ~99k | Customer data and geolocation |
-| `sellers` | ~3k | Seller data |
-| `products` | ~33k | Product catalog |
-| `geolocation` | ~1M | ZIP code coordinates for Brazil |
-
----
-
-## Data Pipeline in Detail
-
-### 1. Ingestion — S3 → Snowflake RAW
-
-- CSVs land in S3 as the immutable source of truth
-- Snowflake **Storage Integration** connects to S3 via IAM Role (no credentials in SQL)
-- `COPY INTO` loads data idempotently — re-runs are safe, no duplicates
-- Metadata columns added at load time: `ingested_at`, `source_file`
-
-```python
-# Idempotent load — FORCE=FALSE skips already-loaded files
-COPY INTO orders
-FROM (SELECT $1,$2,...,$8, CURRENT_TIMESTAMP(), 'olist_orders_dataset.csv'
-      FROM @RAW.s3_stage/olist_orders_dataset.csv)
-FORCE = FALSE
-ON_ERROR = CONTINUE
-```
-
-### 2. Transformation — dbt (3 layers)
-
-```
-RAW → STAGING → MARTS
-```
-
-**Staging**: type casting, snake_case renaming, null handling, deduplication
-**Marts**: dimensional model — fact tables + dimension tables ready for BI
-
-```sql
--- Example: stg_orders.sql
-SELECT
-    order_id,
-    customer_id,
-    order_status,
-    order_purchase_timestamp::TIMESTAMP AS purchased_at,
-    order_delivered_customer_date::TIMESTAMP AS delivered_at,
-    ...
-FROM {{ source('raw', 'orders') }}
-WHERE order_id IS NOT NULL
-QUALIFY ROW_NUMBER() OVER (PARTITION BY order_id ORDER BY ingested_at DESC) = 1
-```
-
-### 3. Data Quality — Great Expectations
-
-- Validation suites per table at staging layer
-- Critical expectations: no nulls on PKs, valid date ranges, referential integrity
-- DAG fails explicitly if critical expectations are not met
-- Data Docs auto-generated as pipeline artifact
-
-### 4. Orchestration — Airflow
-
-- Daily DAG with full backfill support
-- Atomic tasks — each step is independently retriable
-- Alerts on failure
+| Layer | Technology |
+|---|---|
+| Orchestration | Apache Airflow 2.8 |
+| Transformation | dbt-core + dbt-snowflake |
+| Data Warehouse | Snowflake |
+| Cloud Storage | AWS S3 |
+| Data Quality | Great Expectations |
+| Containerization | Docker + Docker Compose |
+| Language | Python 3.11 |
 
 ---
 
 ## Business Metrics Delivered
 
-| Metric | Description |
+| Metric | Model |
 |---|---|
-| **GMV diario/mensual** | Total revenue processed per day and month |
-| **Delivery rate** | % of orders delivered successfully and on time |
-| **Avg ticket** | Average order value by state and product category |
-| **Seller score** | Average review score per seller |
-| **Order cycle time** | Time from purchase to delivery |
+| GMV diario/mensual | `fct_orders` |
+| Tasa de entrega exitosa | `fct_orders.delivery_status` |
+| Ticket promedio por estado y categoría | `fct_orders` + `dim_products` |
+| Score promedio por seller | `dim_sellers` |
+| Tiempo de ciclo (purchase → delivery) | `fct_orders.order_cycle_days` |
+
+---
+
+## Key Engineering Decisions
+
+**S3 como landing zone, no carga directa desde disco**
+S3 desacopla la ingesta del procesamiento. Cualquier consumidor (Spark, Athena, otro pipeline) puede leer los mismos archivos. Es además el patrón que se usa en producción.
+
+**Snowflake Storage Integration en lugar de access keys en SQL**
+La confianza se establece a nivel IAM Role con External ID. Las credenciales AWS nunca tocan Snowflake — significativamente más seguro que `AWS_KEY_ID` en un stage.
+
+**COPY INTO idempotente + flag `--truncate` para limpiar duplicados**
+`FORCE=FALSE` garantiza que re-runs no generen duplicados (Snowflake trackea el historial de carga por archivo). Si los datos ya tienen duplicados, `--truncate` limpia la tabla y recarga con `FORCE=TRUE` — operación segura y trazable.
+
+**dbt con 3 capas explícitas (RAW → STAGING → MARTS)**
+Cada capa tiene un propósito claro y un contrato con la siguiente. Nada de transformaciones de negocio en staging, nada de limpieza en marts. La linaje es completa y los tests validan cada capa.
+
+**GE falla el DAG explícitamente**
+Si una suite de expectativas falla, el pipeline se detiene. No hay datos corruptos llegando a marts silenciosamente.
+
+---
+
+## What I Learned
+
+**Snowflake & SQL**
+- Storage Integration con IAM Role para conectar S3 sin credenciales en queries
+- External Stages y el comportamiento de `COPY INTO` (load history, FORCE flag, ON_ERROR)
+- Diferencia entre `TRUNCATE` y `DELETE` en contexto de COPY INTO history
+- Materialización de modelos: views vs tables según la capa
+
+**dbt**
+- Arquitectura de 3 capas con contratos explícitos entre ellas
+- `QUALIFY ROW_NUMBER()` para deduplicación en staging
+- `sources.yml` como contrato de upstream — no hardcodear nombres de tabla
+- Tests nativos: `not_null`, `unique`, `relationships` como primera línea de defensa
+
+**Great Expectations**
+- Suites por tabla con expectativas críticas vs informativas
+- Checkpoints como unidad de ejecución del pipeline
+- Separación entre validación (pass/fail) y reporting (Data Docs)
+- Comportamiento de `build_data_docs()` cuando hay archivos con permisos de root
+
+**Airflow**
+- DAG con 4 tasks atómicas y dependencias lineales
+- `PythonOperator` para lógica con contexto Python (GE checkpoint)
+- `BashOperator` para comandos externos (dbt, scripts de ingesta)
+- Diferencia entre `schedule_interval` y `catchup` para pipelines diarios
+
+**Python & ingeniería de datos**
+- `@contextmanager` para manejar conexiones de forma limpia
+- Separación de responsabilidades: `snowflake_client.py` no sabe de negocio
+- Flags CLI (`--truncate`, `--dry-run`, `--table`) para operaciones de mantenimiento
+
+**Infraestructura**
+- Docker multi-stage para imagen custom de Airflow con dbt + GE
+- `.env` + `.env.example` como patrón para credenciales en repos públicos
+- Idempotencia como propiedad de diseño, no un feature extra
 
 ---
 
@@ -155,92 +170,31 @@ QUALIFY ROW_NUMBER() OVER (PARTITION BY order_id ORDER BY ingested_at DESC) = 1
 ```
 ecommerce-data-platform/
 ├── airflow/
-│   ├── dags/              # End-to-end pipeline DAG
-│   └── plugins/           # Custom operators
+│   └── dags/
+│       └── ecommerce_pipeline.py   # DAG end-to-end
 ├── dbt/
 │   ├── models/
-│   │   ├── raw/           # Source definitions
-│   │   ├── staging/       # stg_orders, stg_customers, ...
-│   │   └── marts/         # fct_orders, dim_customers, ...
-│   ├── tests/             # Custom dbt tests
-│   └── macros/
+│   │   ├── staging/                # stg_orders, stg_customers, ...
+│   │   └── marts/                  # fct_orders, dim_customers, ...
+│   ├── profiles.yml
+│   └── dbt_project.yml
 ├── gx/
-│   ├── expectations/        # 5 validation suites (JSON)
-│   ├── checkpoints/         # Pipeline checkpoint config
-│   ├── create_suites.py     # Bootstrap: generate expectation suites
-│   └── run_checkpoint.py    # Run validations + generate Data Docs
+│   ├── expectations/               # 5 suites JSON
+│   ├── checkpoints/
+│   ├── create_suites.py
+│   └── run_checkpoint.py
 ├── ingestion/
 │   └── scripts/
-│       ├── upload_to_s3.py          # Bootstrap: local CSVs → S3
-│       ├── load_raw.py              # S3 → Snowflake via COPY INTO
-│       ├── setup_snowflake.sql      # One-time Snowflake setup
-│       └── setup_s3_integration.sql # External stage configuration
+│       ├── upload_to_s3.py         # CSVs locales → S3
+│       ├── load_raw.py             # S3 → Snowflake RAW (COPY INTO)
+│       ├── snowflake_client.py     # Conexión reutilizable
+│       └── setup_snowflake.sql     # DDL inicial
 ├── docker/
-│   ├── Dockerfile           # Custom Airflow image with dbt + GE
-│   └── docker-compose.yml   # Airflow local environment
-├── .env.example
+│   ├── Dockerfile
+│   └── docker-compose.yml
 ├── Makefile
 └── requirements.txt
 ```
-
----
-
-## Getting Started
-
-### Prerequisites
-
-- Python 3.11+
-- Docker + Docker Compose
-- Snowflake account
-- AWS account with S3 access
-
-### Setup
-
-```bash
-# 1. Clone the repo
-git clone https://github.com/EdwLearn/ecommerce-DataPlatform.git
-cd ecommerce-DataPlatform
-
-# 2. Configure environment
-cp .env.example .env
-# Fill in your Snowflake and AWS credentials
-
-# 3. Set up Snowflake (run once)
-# Execute ingestion/scripts/setup_snowflake.sql in Snowflake Worksheets
-# Execute ingestion/scripts/setup_s3_integration.sql
-
-# 4. Upload source data to S3
-python ingestion/scripts/upload_to_s3.py
-
-# 5. Load RAW layer
-python ingestion/scripts/load_raw.py
-
-# 6. Start Airflow
-make airflow-up
-```
-
-### Makefile commands
-
-```bash
-make airflow-up       # Start Airflow with Docker Compose
-make airflow-down     # Stop Airflow
-make dbt-run          # Run all dbt models
-make dbt-test         # Run dbt tests
-make validate         # Run Great Expectations checkpoints
-```
-
----
-
-## Key Engineering Decisions
-
-**Why S3 as landing zone instead of loading CSVs directly?**
-S3 decouples ingestion from loading. Multiple consumers (Spark, Athena, other pipelines) can read the same raw files. It's also the production pattern — data arrives in S3, not on your laptop.
-
-**Why Snowflake Storage Integration instead of access keys?**
-IAM Role assumption with External ID is significantly more secure than storing AWS credentials in Snowflake. The trust is established at the AWS IAM level, not at the query level.
-
-**Why dbt for transformations?**
-SQL transformations need to be version-controlled, testable, and documented. dbt brings software engineering practices to SQL — lineage, tests, and docs out of the box.
 
 ---
 
