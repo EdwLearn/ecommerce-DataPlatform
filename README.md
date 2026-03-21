@@ -200,5 +200,5 @@ ecommerce-data-platform/
 
 ## Author
 
-**Edwin** — Data Engineer
+**Edward** — Data Engineer
 [GitHub](https://github.com/EdwLearn) · [LinkedIn](https://linkedin.com/in/edwlearn)
